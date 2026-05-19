@@ -30,22 +30,13 @@ fn replace_path_placeholder(p: &HttpUrlParameter, url: &str) -> String {
         return url.to_string();
     }
 
-    if !p.name.starts_with(":") {
+    // Path-placeholder parameters have a `{name}`-shaped name.
+    if !(p.name.starts_with('{') && p.name.ends_with('}') && p.name.len() > 2) {
         return url.to_string();
     }
 
-    let re = regex::Regex::new(format!("(/){}([/?#]|$)", p.name).as_str()).unwrap();
-    let result = re
-        .replace_all(url, |cap: &regex::Captures| {
-            format!(
-                "{}{}{}",
-                cap[1].to_string(),
-                urlencoding::encode(p.value.as_str()),
-                cap[2].to_string()
-            )
-        })
-        .into_owned();
-    result
+    let encoded = urlencoding::encode(p.value.as_str()).to_string();
+    url.replace(p.name.as_str(), encoded.as_str())
 }
 
 #[cfg(test)]
@@ -55,31 +46,59 @@ mod placeholder_tests {
 
     #[test]
     fn placeholder_middle() {
-        let p =
-            HttpUrlParameter { name: ":foo".into(), value: "xxx".into(), enabled: true, id: None };
+        let p = HttpUrlParameter {
+            name: "{foo}".into(),
+            value: "xxx".into(),
+            enabled: true,
+            id: None,
+        };
         assert_eq!(
-            replace_path_placeholder(&p, "https://example.com/:foo/bar"),
+            replace_path_placeholder(&p, "https://example.com/{foo}/bar"),
             "https://example.com/xxx/bar",
         );
     }
 
     #[test]
     fn placeholder_end() {
-        let p =
-            HttpUrlParameter { name: ":foo".into(), value: "xxx".into(), enabled: true, id: None };
+        let p = HttpUrlParameter {
+            name: "{foo}".into(),
+            value: "xxx".into(),
+            enabled: true,
+            id: None,
+        };
         assert_eq!(
-            replace_path_placeholder(&p, "https://example.com/:foo"),
+            replace_path_placeholder(&p, "https://example.com/{foo}"),
             "https://example.com/xxx",
         );
     }
 
     #[test]
-    fn placeholder_query() {
-        let p =
-            HttpUrlParameter { name: ":foo".into(), value: "xxx".into(), enabled: true, id: None };
+    fn placeholder_with_literal_colon_suffix() {
+        // The motivating OpenAPI case: brace-delimited placeholders can sit
+        // next to literal `:` characters in a single path segment.
+        let p = HttpUrlParameter {
+            name: "{id}".into(),
+            value: "42".into(),
+            enabled: true,
+            id: None,
+        };
         assert_eq!(
-            replace_path_placeholder(&p, "https://example.com/:foo?:foo"),
-            "https://example.com/xxx?:foo",
+            replace_path_placeholder(&p, "https://example.com/tasks/{id}:increment-importance"),
+            "https://example.com/tasks/42:increment-importance",
+        );
+    }
+
+    #[test]
+    fn placeholder_multiple_occurrences() {
+        let p = HttpUrlParameter {
+            name: "{foo}".into(),
+            value: "xxx".into(),
+            enabled: true,
+            id: None,
+        };
+        assert_eq!(
+            replace_path_placeholder(&p, "https://example.com/{foo}/bar/{foo}"),
+            "https://example.com/xxx/bar/xxx",
         );
     }
 
@@ -92,8 +111,8 @@ mod placeholder_tests {
             id: None,
         };
         assert_eq!(
-            replace_path_placeholder(&p, "https://example.com/:missing"),
-            "https://example.com/:missing",
+            replace_path_placeholder(&p, "https://example.com/{missing}"),
+            "https://example.com/{missing}",
         );
     }
 
@@ -101,36 +120,42 @@ mod placeholder_tests {
     fn placeholder_disabled() {
         let p = HttpUrlParameter {
             enabled: false,
-            name: ":foo".to_string(),
+            name: "{foo}".to_string(),
             value: "xxx".to_string(),
             id: None,
         };
         assert_eq!(
-            replace_path_placeholder(&p, "https://example.com/:foo"),
-            "https://example.com/:foo",
+            replace_path_placeholder(&p, "https://example.com/{foo}"),
+            "https://example.com/{foo}",
         );
     }
 
     #[test]
-    fn placeholder_prefix() {
-        let p =
-            HttpUrlParameter { name: ":foo".into(), value: "xxx".into(), enabled: true, id: None };
+    fn placeholder_non_brace_name_left_alone() {
+        // A parameter without `{...}` framing is a query parameter, not a
+        // path placeholder, and must not touch the URL string.
+        let p = HttpUrlParameter {
+            name: "foo".into(),
+            value: "xxx".into(),
+            enabled: true,
+            id: None,
+        };
         assert_eq!(
-            replace_path_placeholder(&p, "https://example.com/:foooo"),
-            "https://example.com/:foooo",
+            replace_path_placeholder(&p, "https://example.com/{foo}"),
+            "https://example.com/{foo}",
         );
     }
 
     #[test]
     fn placeholder_encode() {
         let p = HttpUrlParameter {
-            name: ":foo".into(),
+            name: "{foo}".into(),
             value: "Hello World".into(),
             enabled: true,
             id: None,
         };
         assert_eq!(
-            replace_path_placeholder(&p, "https://example.com/:foo"),
+            replace_path_placeholder(&p, "https://example.com/{foo}"),
             "https://example.com/Hello%20World",
         );
     }
@@ -138,7 +163,7 @@ mod placeholder_tests {
     #[test]
     fn apply_placeholder() {
         let req = HttpRequest {
-            url: "example.com/:a/bar".to_string(),
+            url: "example.com/{a}/bar".to_string(),
             url_parameters: vec![
                 HttpUrlParameter {
                     name: "b".to_string(),
@@ -147,7 +172,7 @@ mod placeholder_tests {
                     id: None,
                 },
                 HttpUrlParameter {
-                    name: ":a".to_string(),
+                    name: "{a}".to_string(),
                     value: "aaa".to_string(),
                     enabled: true,
                     id: None,

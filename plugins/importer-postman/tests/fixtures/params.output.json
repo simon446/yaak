@@ -36,7 +36,7 @@
         "folderId": null,
         "name": "Form URL",
         "method": "POST",
-        "url": "example.com/:foo/:bar",
+        "url": "example.com/{foo}/{bar}",
         "urlParameters": [
           {
             "name": "disabled",
@@ -54,12 +54,12 @@
             "enabled": true
           },
           {
-            "name": ":foo",
+            "name": "{foo}",
             "value": "fff",
             "enabled": true
           },
           {
-            "name": ":bar",
+            "name": "{bar}",
             "value": "bbb",
             "enabled": true
           }

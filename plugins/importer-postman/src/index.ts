@@ -124,13 +124,14 @@ export function convertPostman(contents: string): ImportPluginResponse | undefin
       }
 
       const { url, urlParameters } = convertUrl(r.url);
+      const requestName = rewritePostmanPathVars(v.name, toRecord(r.url).variable);
 
       const request: ExportResources['httpRequests'][0] = {
         model: 'http_request',
         id: generateId('http_request'),
         workspaceId: workspace.id,
         folderId,
-        name: v.name,
+        name: requestName,
         description: importDescription(r.description),
         method: typeof r.method === 'string' ? r.method : 'GET',
         url,
@@ -195,22 +196,44 @@ function convertUrl(rawUrl: string | unknown): Pick<HttpRequest, 'url' | 'urlPar
   }
 
   if ('variable' in url && Array.isArray(url.variable) && url.variable.length > 0) {
-    for (const v of url.variable) {
+    for (const pathVar of url.variable) {
+      const key = pathVar.key ?? '';
       params.push({
-        name: `:${v.key ?? ''}`,
-        value: v.value ?? '',
-        enabled: !v.disabled,
+        name: `{${key}}`,
+        value: pathVar.value ?? '',
+        enabled: !pathVar.disabled,
       });
     }
+    // Postman uses `:name` in the path string for path variables. Yaak uses `{name}`.
+    v = rewritePostmanPathVars(v, url.variable);
   }
 
   if ('hash' in url && typeof url.hash === 'string') {
     v += `#${url.hash}`;
   }
 
-  // TODO: Implement url.variables (path variables)
-
   return { url: v, urlParameters: params };
+}
+
+/**
+ * Rewrite Postman's `:name` path-variable syntax to Yaak's `{name}` form for every
+ * variable declared in `variables`. Matches are anchored at the next `/`, `?`, `#`,
+ * or end-of-string so prefix collisions (`:foo` inside `:foobar`) are left alone.
+ */
+function rewritePostmanPathVars(
+  input: string,
+  // biome-ignore lint/suspicious/noExplicitAny: postman shape is loose
+  variables: any,
+): string {
+  if (!Array.isArray(variables)) return input;
+  let out = input;
+  for (const v of variables) {
+    const key = v?.key ?? '';
+    if (!key) continue;
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(`:${escaped}(?=[/?#]|$)`, 'g'), `{${key}}`);
+  }
+  return out;
 }
 
 function importAuth(rawAuth: unknown): Pick<HttpRequest, 'authentication' | 'authenticationType'> {

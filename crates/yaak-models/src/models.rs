@@ -847,8 +847,9 @@ pub struct HttpUrlParameter {
     #[serde(default = "default_true")]
     #[ts(optional, as = "Option<bool>")]
     pub enabled: bool,
-    /// Colon-prefixed parameters are treated as path parameters if they match, like `/users/:id`
-    /// Other entries are appended as query parameters
+    /// Brace-delimited parameters are treated as path placeholders if their name appears as
+    /// a literal `{name}` substring in the URL, like `/users/{id}`. Other entries are
+    /// appended as query parameters.
     pub name: String,
     pub value: String,
     #[ts(optional, as = "Option<String>")]
@@ -881,7 +882,7 @@ pub struct HttpRequest {
     pub name: String,
     pub sort_priority: f64,
     pub url: String,
-    /// URL parameters used for both path placeholders (`:id`) and query string entries.
+    /// URL parameters used for both path placeholders (`{id}`) and query string entries.
     pub url_parameters: Vec<HttpUrlParameter>,
 }
 
@@ -1123,7 +1124,7 @@ pub struct WebsocketRequest {
     pub name: String,
     pub sort_priority: f64,
     pub url: String,
-    /// URL parameters used for both path placeholders (`:id`) and query string entries.
+    /// URL parameters used for both path placeholders (`{id}`) and query string entries.
     pub url_parameters: Vec<HttpUrlParameter>,
 }
 

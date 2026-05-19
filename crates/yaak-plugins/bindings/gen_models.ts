@@ -47,7 +47,7 @@ url: string, };
 
 export type HttpRequest = { model: "http_request", id: string, createdAt: string, updatedAt: string, workspaceId: string, folderId: string | null, authentication: Record<string, any>, authenticationType: string | null, body: Record<string, any>, bodyType: string | null, description: string, headers: Array<HttpRequestHeader>, method: string, name: string, sortPriority: number, url: string, 
 /**
- * URL parameters used for both path placeholders (`:id`) and query string entries.
+ * URL parameters used for both path placeholders (`{id}`) and query string entries.
  */
 urlParameters: Array<HttpUrlParameter>, };
 
@@ -70,8 +70,9 @@ export type HttpResponseState = "initialized" | "connected" | "closed";
 
 export type HttpUrlParameter = { enabled?: boolean, 
 /**
- * Colon-prefixed parameters are treated as path parameters if they match, like `/users/:id`
- * Other entries are appended as query parameters
+ * Brace-delimited parameters are treated as path placeholders if their name appears as
+ * a literal `{name}` substring in the URL, like `/users/{id}`. Other entries are
+ * appended as query parameters.
  */
 name: string, value: string, id?: string, };
 
@@ -99,7 +100,7 @@ export type WebsocketEventType = "binary" | "close" | "frame" | "open" | "ping" 
 
 export type WebsocketRequest = { model: "websocket_request", id: string, createdAt: string, updatedAt: string, workspaceId: string, folderId: string | null, authentication: Record<string, any>, authenticationType: string | null, description: string, headers: Array<HttpRequestHeader>, message: string, name: string, sortPriority: number, url: string, 
 /**
- * URL parameters used for both path placeholders (`:id`) and query string entries.
+ * URL parameters used for both path placeholders (`{id}`) and query string entries.
  */
 urlParameters: Array<HttpUrlParameter>, };
 

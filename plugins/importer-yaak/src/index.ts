@@ -80,7 +80,35 @@ export function migrateImport(contents: string) {
     }
   }
 
+  // Migrate v5 to v6 -- path placeholders changed from `:name` to `{name}`. Rewrite parameter
+  // names and any matching `:name` occurrences in the URL string.
+  for (const list of [parsed.resources.httpRequests ?? [], parsed.resources.websocketRequests ?? []]) {
+    for (const req of list) {
+      migratePathPlaceholders(req);
+    }
+  }
+
   return { resources: parsed.resources };
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: legacy import format is untyped
+function migratePathPlaceholders(req: any) {
+  if (!Array.isArray(req?.urlParameters)) return;
+  const renames: string[] = [];
+  for (const p of req.urlParameters) {
+    if (typeof p?.name === 'string' && p.name.startsWith(':') && p.name.length > 1) {
+      const newName = `{${p.name.slice(1)}}`;
+      renames.push(p.name);
+      p.name = newName;
+    }
+  }
+  if (renames.length === 0) return;
+  if (typeof req.url !== 'string') return;
+  for (const oldName of renames) {
+    const bareName = oldName.slice(1);
+    const escaped = bareName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    req.url = req.url.replace(new RegExp(`:${escaped}(?=[/?#]|$)`, 'g'), `{${bareName}}`);
+  }
 }
 
 function isJSObject(obj: unknown) {

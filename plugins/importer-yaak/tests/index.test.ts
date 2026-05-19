@@ -78,6 +78,49 @@ describe('importer-yaak', () => {
     );
   });
 
+  test('converts schema 5 to 6: rewrites `:name` path placeholders to `{name}`', () => {
+    const imported = migrateImport(
+      JSON.stringify({
+        yaakSchema: 5,
+        resources: {
+          httpRequests: [
+            {
+              id: 'r_1',
+              url: 'https://example.com/users/:id/posts/:postId?q=x',
+              urlParameters: [
+                { name: ':id', value: '42', enabled: true },
+                { name: ':postId', value: '7', enabled: true },
+                { name: 'q', value: 'x', enabled: true },
+              ],
+            },
+            {
+              id: 'r_2',
+              url: 'https://example.com/notouch',
+              urlParameters: [{ name: 'q', value: 'x', enabled: true }],
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(imported?.resources.httpRequests).toEqual([
+      expect.objectContaining({
+        id: 'r_1',
+        url: 'https://example.com/users/{id}/posts/{postId}?q=x',
+        urlParameters: [
+          { name: '{id}', value: '42', enabled: true },
+          { name: '{postId}', value: '7', enabled: true },
+          { name: 'q', value: 'x', enabled: true },
+        ],
+      }),
+      expect.objectContaining({
+        id: 'r_2',
+        url: 'https://example.com/notouch',
+        urlParameters: [{ name: 'q', value: 'x', enabled: true }],
+      }),
+    ]);
+  });
+
   test('converts schema 4 to 5', () => {
     const imported = migrateImport(
       JSON.stringify({
